@@ -1,18 +1,14 @@
 # Copyright Broadcom, Inc. All Rights Reserved.
 # SPDX-License-Identifier: APACHE-2.0
 
-FROM docker.io/bitnami/minideb:bookworm
+# TODO: build the valkey here instead of pulling image
+FROM ghcr.io/valkey-io/valkey:8.1.3-bookworm
 
-ARG DOWNLOADS_URL="downloads.bitnami.com/files/stacksmith"
 ARG TARGETARCH
 
-LABEL org.opencontainers.image.base.name="docker.io/bitnami/minideb:bookworm" \
-      org.opencontainers.image.created="2025-09-06T21:41:14Z" \
-      org.opencontainers.image.description="Application packaged by Broadcom, Inc." \
-      org.opencontainers.image.documentation="https://github.com/bitnami/containers/tree/main/bitnami/valkey-cluster/README.md" \
-      org.opencontainers.image.source="https://github.com/bitnami/containers/tree/main/bitnami/valkey-cluster" \
-      org.opencontainers.image.title="valkey-cluster" \
-      org.opencontainers.image.vendor="Broadcom, Inc." \
+LABEL org.opencontainers.image.documentation="https://github.com/m-wrzesien/containers/tree/main/bitnami/valkey/README.md" \
+      org.opencontainers.image.source="https://github.com/m-wrzesien/containers/tree/main/bitnami/valkey" \
+      org.opencontainers.image.title="valkey" \
       org.opencontainers.image.version="8.1.3"
 
 ENV HOME="/" \
@@ -24,22 +20,25 @@ COPY prebuildfs /
 SHELL ["/bin/bash", "-o", "errexit", "-o", "nounset", "-o", "pipefail", "-c"]
 # Install required system packages and dependencies
 RUN install_packages ca-certificates curl libgomp1 libssl3 procps
-RUN --mount=type=secret,id=downloads_url,env=SECRET_DOWNLOADS_URL \
-    DOWNLOADS_URL=${SECRET_DOWNLOADS_URL:-${DOWNLOADS_URL}} ; \
-    mkdir -p /tmp/bitnami/pkg/cache/ ; cd /tmp/bitnami/pkg/cache/ || exit 1 ; \
-    COMPONENTS=( \
-      "wait-for-port-1.0.10-1-linux-${OS_ARCH}-debian-12" \
-      "valkey-8.1.3-0-linux-${OS_ARCH}-debian-12" \
-    ) ; \
-    for COMPONENT in "${COMPONENTS[@]}"; do \
-      if [ ! -f "${COMPONENT}.tar.gz" ]; then \
-        curl -SsLf "https://${DOWNLOADS_URL}/${COMPONENT}.tar.gz" -O ; \
-        curl -SsLf "https://${DOWNLOADS_URL}/${COMPONENT}.tar.gz.sha256" -O ; \
-      fi ; \
-      sha256sum -c "${COMPONENT}.tar.gz.sha256" ; \
-      tar -zxf "${COMPONENT}.tar.gz" -C /opt/bitnami --strip-components=2 --no-same-owner ; \
-      rm -rf "${COMPONENT}".tar.gz{,.sha256} ; \
-    done
+
+ENV WAIT_FOR_VERSION="v1.0.10" \
+    WAIT_FOR_CHECKSUM_AMD64="75c775b98d52cbe3e8ac98dfcecd8fb6a1f6c4abf7d5a2438ff7b0beb0fe84d2" \
+    WAIT_FOR_CHECKSUM_ARM64="17e4d8ebba42cd3a1f2b0334d20dac33190982be82298146c79a5378110e9458" \
+    WAIT_FOR_ARCHIVE="wait-for-port.tar.gz" \
+    WAIT_FOR_BIN="wait-for-port" 
+
+ENV WAIT_FOR_URL="https://github.com/bitnami/${WAIT_FOR_BIN}/releases/download/${WAIT_FOR_VERSION}/${WAIT_FOR_BIN}-${OS_NAME}-${OS_ARCH}.tar.gz"
+
+RUN curl -SsLf "${WAIT_FOR_URL}" -o "${WAIT_FOR_ARCHIVE}" && \
+    if [[ "$OS_ARCH" == "amd64" ]]; then \
+        echo "${WAIT_FOR_CHECKSUM_AMD64}" "${WAIT_FOR_ARCHIVE}" | sha256sum --check ; \
+    else \
+        echo "${WAIT_FOR_CHECKSUM_ARM64}" "${WAIT_FOR_ARCHIVE}" | sha256sum --check ; \
+    fi && \
+    tar -zxf "${WAIT_FOR_ARCHIVE}" -C /opt/bitnami --no-same-owner && \
+    mv "/opt/bitnami/${WAIT_FOR_BIN}-${OS_NAME}-${OS_ARCH}" "/opt/bitnami/${WAIT_FOR_BIN}" && \
+    rm "${WAIT_FOR_ARCHIVE}"
+
 RUN apt-get update && apt-get upgrade -y && \
     apt-get clean && rm -rf /var/lib/apt/lists /var/cache/apt/archives
 RUN chmod g+rwX /opt/bitnami
@@ -50,7 +49,7 @@ COPY rootfs /
 RUN /opt/bitnami/scripts/valkey-cluster/postunpack.sh
 ENV APP_VERSION="8.1.3" \
     BITNAMI_APP_NAME="valkey-cluster" \
-    IMAGE_REVISION="4" \
+    IMAGE_REVISION="5" \
     PATH="/opt/bitnami/common/bin:/opt/bitnami/valkey/bin:$PATH"
 
 EXPOSE 6379
