@@ -118,3 +118,33 @@ jobs:
               core.setFailed(error.message)
             }
             return state
+  build-images:
+    runs-on: ubuntu-latest
+    name: Build images
+    needs:
+      - get-containers
+    if: ${{ needs.get-containers.outputs.result == 'ok' && needs.get-containers.outputs.containers != '[""]' && needs.get-containers.outputs.containers != '[]' && needs.get-containers.outputs.containers != '' }}
+    strategy:
+      matrix:
+        container: ${{ fromJSON(needs.get-containers.outputs.containers) }}
+    env:
+      REGISTRY: ghcr.io
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5
+
+      - name: Prepare image name
+        run: |
+          APP_PATH="${{ matrix.container}}"
+          cd ${APP_PATH}
+          APP_NAME=$(echo "${APP_PATH}" | awk -F/ '{print $2}')
+          APP_VERSION=$(cat Dockerfile | grep APP_VERSION= | grep -o '".*"' | tr -d '"')
+          IMAGE_REVISION=$(cat Dockerfile | grep IMAGE_REVISION= | grep -o '[0-9]*' || echo 0)
+          OS_FLAVOUR=$(echo "${APP_PATH}" | awk -F/ '{print $4}')
+          echo "FULL_IMAGE_NAME=${REGISTRY}/${GITHUB_REPOSITORY}/${APP_NAME}:${APP_VERSION}-${OS_FLAVOUR}-r${IMAGE_REVISION}-PR-${{ github.event.number }}" >> $GITHUB_ENV
+
+      - name: Build docker image
+        uses: m-wrzesien/gh-actions/.github/actions/docker-build@master
+        with:
+          context: ${{ matrix.container }}
+          tag: ${{ env.FULL_IMAGE_NAME }}
