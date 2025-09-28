@@ -4,6 +4,8 @@ on: # main branch changes
   push:
     branches:
       - main
+    paths:
+      - 'bitnami/**'
 permissions: {}
 # Avoid concurrency over the same commit
 concurrency:
