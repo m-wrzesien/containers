@@ -16,5 +16,5 @@ Only a subset of images will be supported here!
 
 Images can be found at:
 ```
-ghcr.io/mwrzesien/containers/APP:[TAG]
+ghcr.io/m-wrzesien/containers/APP:[TAG]
 ```
